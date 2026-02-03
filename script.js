@@ -43,13 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let postingsReclickTimeoutId = null;
     let isPostingsLoadingOverlayActive = false;
 
-    const MEMES_TO_GENERATE_BATCH = 4;
+    const MEMES_TO_GENERATE_BATCH = 5;
 
     const loadingMessages = {
         memes: {
             searching: "Durchsuche die Datenbank nach vorhandenen Memes...",
             notFoundPrompt: "Zu diesem Thema wurden leider keine Memes gefunden. Möchtest du, dass ich Memes dazu erstelle?",
-            creating: "Erstelle Memes zum Thema Weltraumtourismus. Dies kann einige Sekunden dauern, sieh dir daher inzwischen die anderen Kategorien dieser Website durch. Du bekommst eine Nachricht, sobald sie fertig sind.",
+            creating: "Erstelle Memes zum Thema Weltraumtourismus. Dies kann einige Minuten dauern, sieh dir daher inzwischen die anderen Kategorien dieser Website durch. Du bekommst eine Nachricht, sobald sie fertig sind.",
             creating2: "Erstelle Memes",
 	        askAgain: "Soll ich noch ein Meme erstellen?",
 	        allShown: ""
@@ -437,7 +437,7 @@ function loadTwitterWidgets(targetElement) {
             } else {
                 console.log("Memes generated in background, waiting for user to return to Memes category.");
             }
-        }, 4000);
+        }, 240000);
     }
 
     function extractTweetText(htmlString) {
