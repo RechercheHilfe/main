@@ -152,7 +152,7 @@ function loadTwitterWidgets(targetElement) {
     const safetyTimeout = setTimeout(() => {
         console.warn("%c[Twitter Embeds] Safety timeout reached. Hiding spinner.", "color: orange;");
         hideOverlayLoadingSpinner();
-    }, 20000);
+    }, 7000);
 
     const finishLoading = (success) => {
         clearTimeout(safetyTimeout); // Sicherheits-Timeout stoppen
