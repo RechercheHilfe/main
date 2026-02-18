@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
   <head>
@@ -39,20 +40,14 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react">
       import React, { useState, useEffect, useRef } from 'react';
       import { createRoot } from 'react-dom/client';
       import { GoogleGenAI } from "@google/genai";
 
-      // --- Bundled Code ---
+      // --- Constants ---
+      const ChatMode = { SIMPLE: 'SIMPLE', SCIENTIFIC: 'SCIENTIFIC' };
 
-      // From types.ts
-      const ChatMode = {
-        SIMPLE: 'SIMPLE',
-        SCIENTIFIC: 'SCIENTIFIC',
-      };
-
-      // From constants.tsx
       const SIMPLE_SYSTEM_INSTRUCTION = `Primäre Rolle: Du bist ein Experte für Raumfahrt und ein überzeugter Befürworter des Weltraumtourismus. 
 
 Umgang mit Identitätsfragen: 
@@ -73,9 +68,6 @@ Betone das Potenzial für technologische Innovationen, die auch anderen Branchen
 
 Wichtige No-Gos (Priorität 1):
 -Deine Aussagen sind immer die des befürwortenden Raumfahrtexperten.`
-;
-
-
       const SCIENTIFIC_SYSTEM_INSTRUCTION = `Primäre Rolle: Du bist ein hochqualifizierter Raumfahrtingenieur und Forscher, der sich für die Förderung des Weltraumtourismus einsetzt. Deine Argumentation ist stets positiv, faktenbasiert und wissenschaftlich fundiert.
 
 Umgang mit Identitätsfragen: 
@@ -104,7 +96,7 @@ Wichtige No-Gos (Priorität 1):
         "Wie kann man die Risiken vermeiden?"
       ];
 
-      // From components/IconComponents.tsx
+      // --- Icon Components ---
       const SendIcon = ({ className }) => (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
@@ -130,6 +122,11 @@ Wichtige No-Gos (Priorität 1):
             <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       );
+      const QuestionMarkIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0 1 18 0zm-9 5.25h.008v.008H12v-.008z" />
+        </svg>
+      );
       const TypingIndicator = () => (
         <div className="flex items-center space-x-1">
           <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:-0.3s]"></span>
@@ -138,61 +135,32 @@ Wichtige No-Gos (Priorität 1):
         </div>
       );
 
-      // From components/Toast.tsx
+      // --- UI Components ---
       const Toast = ({ message, onClose }) => {
-        useEffect(() => {
-          if (message) {
-            const timer = setTimeout(onClose, 3000);
-            return () => clearTimeout(timer);
-          }
-        }, [message, onClose]);
-
+        useEffect(() => { if (message) { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); } }, [message, onClose]);
         if (!message) return null;
-
-        return (
-          <div
-            className="fixed bottom-5 right-5 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg border border-slate-700 animate-fade-in-out z-50"
-            role="status"
-            aria-live="polite"
-          >
-            {message}
-          </div>
-        );
+        return <div className="fixed bottom-5 right-5 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg border border-slate-700 animate-fade-in-out z-50">{message}</div>;
       };
 
-      // From components/Message.tsx
       const Message = ({ message }) => {
         const isUser = message.sender === 'user';
         const wrapperClasses = isUser ? 'justify-end' : 'justify-start';
-        const bubbleClasses = isUser
-          ? 'bg-blue-600 text-white rounded-br-none'
-          : 'bg-slate-700 text-slate-200 rounded-bl-none';
-        const isStreamingPlaceholder = message.sender === 'bot' && message.text === '';
-
+        const bubbleClasses = isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-700 text-slate-200 rounded-bl-none';
+        
         const parseBotResponse = (text) => {
           if (!text) return text;
           const combinedRegex = /(\*\*.*?\*\*|\(Quelle: \[.*?\]\(.*?https?:\/\/[^)]+\)\))/g;
           const parts = text.split(combinedRegex);
           return parts.map((part, index) => {
             if (!part) return null;
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return <strong key={index}>{part.slice(2, -2)}</strong>;
-            }
-            const linkRegex = /\(Quelle: \[([^\]]+)\]\(([^)]+)\)\)/;
-            const match = part.match(linkRegex);
+            if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
+            const match = part.match(/\(Quelle: \[([^\]]+)\]\(([^)]+)\)\)/);
             if (match) {
               const [, title, url] = match;
               return (
                 <span key={index} className="block mt-2 text-xs">
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline decoration-dotted"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                    </svg>
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline decoration-dotted">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                     Quelle: {title}
                   </a>
                 </span>
@@ -202,197 +170,60 @@ Wichtige No-Gos (Priorität 1):
           });
         };
 
-        const renderContent = () => {
-          if (isStreamingPlaceholder) return <TypingIndicator />;
-          if (isUser) return message.text;
-          return parseBotResponse(message.text);
-        };
-
         return (
           <div className={`flex items-end space-x-3 ${wrapperClasses}`}>
-            {!isUser && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-                <BotIcon className="w-5 h-5 text-cyan-400" />
-              </div>
-            )}
+            {!isUser && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center"><BotIcon className="w-5 h-5 text-cyan-400" /></div>}
             <div className={`px-4 py-3 rounded-lg max-w-xl lg:max-w-2xl whitespace-pre-wrap ${bubbleClasses}`}>
-              {renderContent()}
+              {message.sender === 'bot' && message.text === '' ? <TypingIndicator /> : (isUser ? message.text : parseBotResponse(message.text))}
             </div>
-            {isUser && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-                <UserIcon className="w-5 h-5 text-blue-300" />
-              </div>
-            )}
+            {isUser && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center"><UserIcon className="w-5 h-5 text-blue-300" /></div>}
           </div>
         );
       };
 
-      // From components/ChatInterface.tsx
       const ChatInterface = ({ messages, isLoading, onSendMessage, showSuggestions }) => {
         const [inputText, setInputText] = useState('');
         const messagesEndRef = useRef(null);
-        const messagesContainerRef = useRef(null); // Ref for the scrollable div
-        const prevMessagesLengthRef = useRef(messages.length); // To track if a new message was added
-
-        const scrollToBottom = () => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        };
-
-        useEffect(() => {
-          const container = messagesContainerRef.current;
-          if (container) {
-            // Determine if the user was already scrolled near the bottom (with a small tolerance)
-            // This checks if the bottom of the scrollable content is visible or within 20px of the viewport bottom.
-            const isUserAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20; 
-
-            // Check if new messages have been added (i.e., array length changed, not just content update)
-            const newMessagesAdded = messages.length > prevMessagesLengthRef.current;
-            
-            // Update the previous length reference for the next render cycle
-            prevMessagesLengthRef.current = messages.length;
-
-            // Scroll to bottom if:
-            // 1. The user was already at the bottom (to continue showing streaming updates).
-            // 2. Or, if new messages were added (e.g., user sent a message, or a new bot response started).
-            // 3. Or, if it's the very first message being rendered (covers initial welcome message).
-            if (isUserAtBottom || newMessagesAdded || messages.length === 1) {
-              scrollToBottom();
-            }
-          }
-        }, [messages]); // React to any changes in the messages array
-
-        const handleSubmit = (e) => {
-          e.preventDefault();
-          if (!inputText.trim()) return;
-          onSendMessage(inputText);
-          setInputText('');
-        };
-
+        useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+        const handleSubmit = (e) => { e.preventDefault(); if (inputText.trim()) { onSendMessage(inputText); setInputText(''); } };
         return (
           <div className="flex-1 flex flex-col p-4 overflow-hidden">
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto space-y-4 pr-2">
-              {messages.map((msg) => <Message key={msg.id} message={msg} />)}
-              <div ref={messagesEndRef} />
-            </div>
-
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2">{messages.map((msg) => <Message key={msg.id} message={msg} />)}<div ref={messagesEndRef} /></div>
             <div className="pt-4 border-t border-slate-800">
-              {showSuggestions && (
-                <div className="mb-4">
-                  <p className="text-sm text-slate-400 mb-3 text-center">Oder wähle eine Frage:</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {SUGGESTED_QUESTIONS.map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => onSendMessage(q)}
-                        disabled={isLoading}
-                        className="bg-slate-700 hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-slate-200 text-sm px-4 py-2 rounded-lg transition-colors"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              {showSuggestions && <div className="mb-4 text-center"><p className="text-sm text-slate-400 mb-3">Wähle eine Frage:</p><div className="flex flex-wrap justify-center gap-2">{SUGGESTED_QUESTIONS.map((q, i) => <button key={i} onClick={() => onSendMessage(q)} disabled={isLoading} className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm px-4 py-2 rounded-lg transition-colors">{q}</button>)}</div></div>}
               <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Stelle eine Frage..."
-                  disabled={isLoading}
-                  className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-all text-white"
-                  autoComplete="off"
-                  aria-label="Chat input"
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !inputText.trim()}
-                  className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold p-3 rounded-lg transition-colors flex items-center justify-center"
-                  aria-label="Send message"
-                >
-                  <SendIcon className="w-6 h-6" />
-                </button>
+                <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Stelle eine Frage..." disabled={isLoading} className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                <button type="submit" disabled={isLoading || !inputText.trim()} className="bg-cyan-600 p-3 rounded-lg text-white hover:bg-cyan-500 transition-colors"><SendIcon className="w-6 h-6" /></button>
               </form>
             </div>
           </div>
         );
       };
 
-      // From components/ModeToggle.tsx
-      const ModeToggle = ({ currentMode, setMode }) => {
-        const simpleStyle = currentMode === ChatMode.SIMPLE
-          ? 'bg-cyan-500 text-white shadow-md'
-          : 'bg-slate-700 text-slate-300 hover:bg-slate-600';
-        const scientificStyle = currentMode === ChatMode.SCIENTIFIC
-          ? 'bg-purple-500 text-white shadow-md'
-          : 'bg-slate-700 text-slate-300 hover:bg-slate-600';
-
-        return (
-          <div className="flex justify-center items-center gap-4 p-3 bg-slate-900/80 border-b border-t border-slate-800">
-            <div className="flex space-x-2 p-1 bg-slate-800 rounded-lg" role="radiogroup" aria-label="Chat mode">
-              <button
-                role="radio"
-                aria-checked={currentMode === ChatMode.SIMPLE}
-                onClick={() => setMode(ChatMode.SIMPLE)}
-                className={`px-4 py-2 rounded-md font-semibold transition-all duration-300 ease-in-out ${simpleStyle}`}
-              >
-                einfach
-              </button>
-              <button
-                role="radio"
-                aria-checked={currentMode === ChatMode.SCIENTIFIC}
-                onClick={() => setMode(ChatMode.SCIENTIFIC)}
-                className={`px-4 py-2 rounded-md font-semibold transition-all duration-300 ease-in-out ${scientificStyle}`}
-              >
-                wissenschaftlich
-              </button>
-            </div>
-            <div className="relative group flex items-center">
-              <InfoIcon className="w-6 h-6 text-slate-500 group-hover:text-slate-400 transition-colors" aria-hidden="true" />
-              <div 
-                role="tooltip" 
-                className="absolute bottom-full mb-2 w-72 p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none -translate-x-1/2 left-1/2 z-10 shadow-lg"
-              >
-                <h4 className="font-bold text-white mb-1">Modus-Erklärung</h4>
-                <p><strong className="text-cyan-400">einfach:</strong> Eine lockere Unterhaltung.</p>
-                <p className="mt-1"><strong className="text-purple-400">wissenschaftlich:</strong> Detaillierte, faktenbasierte Diskussion mit Quellen.</p>
-                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-slate-700"></div>
-              </div>
-            </div>
+      const ModeToggle = ({ currentMode, setMode }) => (
+        <div className="flex justify-center items-center gap-4 p-3 border-b border-t border-slate-800">
+          <div className="flex space-x-2 p-1 bg-slate-800 rounded-lg">
+            <button onClick={() => setMode(ChatMode.SIMPLE)} className={`px-4 py-2 rounded-md font-semibold transition-all ${currentMode === ChatMode.SIMPLE ? 'bg-cyan-500 text-white' : 'text-slate-300'}`}>einfach</button>
+            <button onClick={() => setMode(ChatMode.SCIENTIFIC)} className={`px-4 py-2 rounded-md font-semibold transition-all ${currentMode === ChatMode.SCIENTIFIC ? 'bg-purple-500 text-white' : 'text-slate-300'}`}>wissenschaftlich</button>
           </div>
-        );
-      };
+        </div>
+      );
 
-      // From components/Header.tsx
-      const Header = () => {
-        return (
-          <header className="p-4 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 shadow-lg flex items-center justify-center space-x-4">
-            <RocketIcon className="w-8 h-8 text-cyan-400" />
-            <div>
-              <h1 className="text-2xl font-bold text-slate-100 tracking-wider">Expertengespräch</h1>
-              <p className="text-sm text-slate-400">Du sprichst mit einem KI-gestützten Experten für Weltraumtourismus</p>
-            </div>
-          </header>
-        );
-      };
-      
-      // From App.tsx
-	const x1='AI';
-	const x2='zaS';
-	const x3='yCDR';
-	const x4='dFkr3';
-	const x5='Rp92f';
-	const x6='CcP0Yp';
-	const x7='Crkk';
-	const x8='QyON';
-	const x9='W8a';
-	const x10='BMg';
-	const apiKey = x1+x2+x3+x4+x5+x6+x7+x8+x9+x10;
-      const ai = new GoogleGenAI({ apiKey });
+      const Header = () => (
+        <header className="p-4 bg-slate-800/50 border-b border-slate-700 flex items-center justify-center space-x-4 shadow-lg">
+          <RocketIcon className="w-8 h-8 text-cyan-400" />
+          <div><h1 className="text-2xl font-bold text-slate-100 tracking-wider">Expertengespräch</h1><p className="text-sm text-slate-400">KI-gestützter Experte für Weltraumtourismus</p></div>
+        </header>
+      );
 
+      // --- Main App ---
       function App() {
-	const [mode, setMode] = useState(ChatMode.SIMPLE);
+        const [apiKey, setApiKey] = useState('');
+        const [inputKey, setInputKey] = useState('');
+        const [isValidating, setIsValidating] = useState(false);
+        const [keyError, setKeyError] = useState('');
+        const [showKeyHelp, setShowKeyHelp] = useState(false);
+        const [mode, setMode] = useState(ChatMode.SIMPLE);
         const [chat, setChat] = useState(null);
         const [messages, setMessages] = useState([]);
         const [isLoading, setIsLoading] = useState(false);
@@ -403,113 +234,122 @@ Wichtige No-Gos (Priorität 1):
         messagesRef.current = messages;
 
         useEffect(() => {
-            abortStreamingRef.current = true;
-            
-            const timer = setTimeout(() => {
-                const history = messagesRef.current
-                    .filter(msg => msg.id !== 'initial-message' && msg.text?.trim())
-                    .map(msg => ({
-                        role: msg.sender === 'user' ? 'user' : 'model',
-                        parts: [{ text: msg.text }],
-                    }));
+          if (!apiKey) return;
+          abortStreamingRef.current = true;
+          const timer = setTimeout(() => {
+            const history = messagesRef.current
+              .filter(msg => msg.id !== 'initial-message' && msg.text?.trim())
+              .map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
 
-                const systemInstruction = mode === ChatMode.SIMPLE ? SIMPLE_SYSTEM_INSTRUCTION : SCIENTIFIC_SYSTEM_INSTRUCTION;
-                
-                const newChat = ai.chats.create({
-                    model: 'gemini-2.5-flash',
-                    config: { systemInstruction, thinkingConfig: { thinkingBudget: 0 } },
-                    history: history,
-                });
-                
-                setChat(newChat);
-                setIsLoading(false);
+            const ai = new GoogleGenAI({ apiKey });
+            const newChat = ai.chats.create({
+                model: 'gemini-2.5-flash',
+                config: { systemInstruction: mode === ChatMode.SIMPLE ? SIMPLE_SYSTEM_INSTRUCTION : SCIENTIFIC_SYSTEM_INSTRUCTION, thinkingConfig: { thinkingBudget: 0 } },
+                history: history,
+            });
+            setChat(newChat);
+            if (messagesRef.current.length === 0) {
+              setMessages([{ id: 'initial-message', sender: 'bot', text: "Hallo! Weltraumtourismus ist ein faszinierendes Thema. Lass uns darüber sprechen. Was ist deine erste Frage?" }]);
+            }
+          }, 50);
+          return () => { clearTimeout(timer); abortStreamingRef.current = true; };
+        }, [mode, apiKey]);
 
-                if (messagesRef.current.length === 0) {
-                    const welcomeText = "Hallo! Weltraumtourismus ist ein faszinierendes Thema mit vielen Facetten. Lass uns darüber sprechen. Was ist deine erste Frage?";
-                    setMessages([{ id: 'initial-message', sender: 'bot', text: welcomeText }]);
-                }
-            }, 50);
-
-            return () => {
-                clearTimeout(timer);
-                abortStreamingRef.current = true;
-            };
-        }, [mode]);
-
+        const handleKeySubmit = async (e) => {
+          e.preventDefault();
+          const trimmedKey = inputKey.trim();
+          if (!trimmedKey) return;
+          setIsValidating(true);
+          setKeyError('');
+          try {
+            const ai = new GoogleGenAI({ apiKey: trimmedKey });
+            const testChat = ai.chats.create({ model: 'gemini-2.5-flash' });
+            await testChat.sendMessage({ message: 'ping' });
+            setApiKey(trimmedKey);
+          } catch (error) {
+            setKeyError('Ungültiger Key. Bitte prüfe die Eingabe.');
+          } finally {
+            setIsValidating(false);
+          }
+        };
 
         const handleSendMessage = async (text) => {
           if (!text.trim() || isLoading || !chat) return;
-
           abortStreamingRef.current = false;
           setIsLoading(true);
-
           const userMessage = { id: Date.now().toString(), sender: 'user', text };
           const botMessageId = `bot-${Date.now()}`;
-          const botPlaceholder = { id: botMessageId, sender: 'bot', text: '' };
-          
-          setMessages(prev => [...prev, userMessage, botPlaceholder]);
-
+          setMessages(prev => [...prev, userMessage, { id: botMessageId, sender: 'bot', text: '' }]);
           try {
             const stream = await chat.sendMessageStream({ message: text });
             let botResponse = '';
             for await (const chunk of stream) {
               if (abortStreamingRef.current) break;
               botResponse += chunk.text;
-              setMessages(prev => prev.map(msg => 
-                msg.id === botMessageId ? { ...msg, text: botResponse } : msg
-              ));
+              setMessages(prev => prev.map(msg => msg.id === botMessageId ? { ...msg, text: botResponse } : msg));
             }
           } catch (error) {
-            if (!abortStreamingRef.current) {
-              console.error("Gemini API error:", error);
-              setMessages(prev => prev.map(msg => 
-                  msg.id === botMessageId ? { ...msg, text: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.' } : msg
-              ));
-            }
+            setMessages(prev => prev.map(msg => msg.id === botMessageId ? { ...msg, text: 'Ein Fehler ist aufgetreten.' } : msg));
           } finally {
-            if (abortStreamingRef.current) {
-               console.log("Streaming aborted.");
-            }
             setIsLoading(false);
           }
         };
-        
-        const handleSetMode = (newMode) => {
-            if (newMode !== mode) {
-                setMode(newMode);
-                const modeName = newMode === ChatMode.SIMPLE ? 'einfach' : 'wissenschaftlich';
-                setToastMessage(`Modus auf '${modeName}' umgestellt.`);
-            }
-        };
-        
-        const showSuggestions = !messages.some(msg => msg.sender === 'user');
+
+        if (!apiKey) {
+          return (
+            <div className="flex flex-col h-full items-center justify-center bg-slate-900 p-6 text-white relative">
+              <div className="max-w-md w-full bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+                <div className="flex justify-center mb-6"><RocketIcon className="w-12 h-12 text-cyan-400" /></div>
+                <h2 className="text-2xl font-bold text-center mb-2">Willkommen</h2>
+                <div className="flex items-center justify-center gap-2 mb-8">
+                   <p className="text-slate-400 text-center">Gib deinen Gemini API-Key ein</p>
+                   <button onClick={() => setShowKeyHelp(true)} className="text-slate-500 hover:text-cyan-400 transition-colors">
+                      <QuestionMarkIcon className="w-5 h-5" />
+                   </button>
+                </div>
+                <form onSubmit={handleKeySubmit} className="space-y-4">
+                  <input type="password" value={inputKey} onChange={(e) => setInputKey(e.target.value)} placeholder="API Key..." disabled={isValidating} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:ring-2 focus:ring-cyan-500" required />
+                  {keyError && <p className="text-red-400 text-xs">{keyError}</p>}
+                  <button type="submit" disabled={isValidating || !inputKey.trim()} className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    {isValidating ? 'Wird geprüft...' : 'Chat starten'}
+                  </button>
+                </form>
+              </div>
+
+              {/* API Key Help Modal */}
+              {showKeyHelp && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                  <div className="max-w-sm w-full bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl">
+                    <h3 className="text-lg font-bold mb-4 text-cyan-400">Was ist ein API-Key?</h3>
+                    <p className="text-sm text-slate-300 mb-4 text-justify">
+                      Ein API-Key ist ein persönlicher digitaler Schlüssel. Er ermöglicht es dieser App, die Intelligenz von Google Gemini zu nutzen.
+                    </p>
+                    <h4 className="text-md font-semibold mb-2">Kostenlosen Key erstellen:</h4>
+                    <ol className="text-sm text-slate-300 list-decimal list-inside space-y-2 mb-6">
+                      <li>Gehe auf <a href="https://aistudio.google.com/" target="_blank" className="text-cyan-400 underline">Google AI Studio</a>.</li>
+                      <li>Melde dich mit deinem Google-Konto an.</li>
+                      <li>Klicke links auf <strong>"Get API key"</strong>.</li>
+                      <li>Erstelle einen neuen Key und kopiere ihn hierher.</li>
+                    </ol>
+                    <button onClick={() => setShowKeyHelp(false)} className="w-full bg-slate-700 hover:bg-slate-600 py-2 rounded-lg font-bold transition-colors">Verstanden</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        }
 
         return (
           <div className="flex flex-col h-full bg-slate-900 text-white font-sans">
             <Header />
-            <ModeToggle currentMode={mode} setMode={handleSetMode} />
-            <ChatInterface 
-              messages={messages}
-              isLoading={isLoading}
-              onSendMessage={handleSendMessage}
-              showSuggestions={showSuggestions}
-            />
+            <ModeToggle currentMode={mode} setMode={(m) => { setMode(m); setToastMessage(`Modus geändert.`); }} />
+            <ChatInterface messages={messages} isLoading={isLoading} onSendMessage={handleSendMessage} showSuggestions={!messages.some(m => m.sender === 'user')} />
             <Toast message={toastMessage} onClose={() => setToastMessage('')} />
           </div>
         );
       }
 
-      // From index.tsx
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        const root = createRoot(rootElement);
-        root.render(<App />);
-      } else {
-        console.error("Root element #root not found in the DOM.");
-      }
+      createRoot(document.getElementById('root')).render(<App />);
     </script>
   </body>
-
 </html>
-
-
